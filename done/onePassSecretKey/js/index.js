@@ -2,33 +2,31 @@
 //
 log("*** Alice crée son message en clair. ***");
 // text to be ciphered
-var plainTxt="Please Help me !" ; 
+var plainTxt="Please Help me !" ;
 //var plainTxt=toUnicode("Plœase Help me !") ; // œ // &#339; // "Toujours avec le principe de substitution, le bon vieux César y a mis sa patte";//"Help me !"; // 9 chars
 log("Texte clair : <b>"+plainTxt+"</b>");
 log();
 log("*** Création de la clé (de même longueur que le message) par Alice qu'elle enverra à Bob ***");
-// Number of bytes per bloc
-const by=4; // 32bits 
 //
 // key creation
 // var key="$^ù*)=}|a"; // OR
 var o=createKey (plainTxt.length);
 var key=o.key;
-var binKey=o.binKey; 
+var binKey=o.binKey;
 log("Clé affichée en binaire : "+binKey);
 log("Clé utilisée : "+key);
 log();
 //
 // breakPoint();
-// 
+//
 // Convert plain text to array of 4 bytes elements
-var arrBy= stringToArrayBy(plainTxt,by);
-log("*** Alice regroupe les caractères "+by+" par "+by+" ("+by*8+" bits) dans un tableau");
+var arrBy= stringToArray(plainTxt);
+log("*** Alice regroupe les caractères 4 par 4 (32 bits) dans un tableau");
 logArr(arrBy);
 //
 // Convert key to array of 4 bytes elements
-var keyBy=stringToArrayBy(key,by);
-log("Les caractères de la clé sont aussi regroupés par "+by);
+var keyBy=stringToArray(key);
+log("Les caractères de la clé sont aussi regroupés par 4");
 logArr(keyBy);
 //
 // Ciphering
@@ -38,17 +36,17 @@ logArr(cipherArr);
 log();
 //
 //breakPoint();
-// 
+//
 //
 // Alice has given key to Bob
 //
-log("*** Bob  reçoit le message et le déchiffre avec la même clé ***"); 
+log("*** Bob  reçoit le message et le déchiffre avec la même clé ***");
 // Unciphering
 uncipherArr=uncipher(cipherArr,keyBy);
 log("Tableau déchiffré (doit être égal au tableau 'avant chiffrement' ci-dessus)  : ");
 logArr(uncipherArr);
 // Uncipher array to string
-var unciphText=arrayByToString (uncipherArr,by) ;
+var unciphText=arrayToString (uncipherArr) ;
 log("Text déchiffré (doit être égal au texte initial d'Alice ci-dessus) : <b>"+unciphText+"</b>");
 //
 
@@ -56,16 +54,16 @@ log("Text déchiffré (doit être égal au texte initial d'Alice ci-dessus) : <b
 /**
 * Random key creation
 * @param  len 			Length of plain text
-* @return object with 
+* @return object with
 * 				key 	Created key
 *				binKey 	binary string of key (only to display it)
 */
 function createKey (len) {
 	//TODO
 	var key="";var binKey8=""; var binKey=""; var k=0;
-	for (i=0;i<len*8;i++) {		
+	for (i=0;i<len*8;i++) {
 		var bit=random();
-		var k=k+bit; 
+		var k=k+bit;
 		binKey8+= bit.toString() ; // binKey8+=""+bit; // binkey+=String(bit);
 		if ( i%8==7) {
 			key+=String.fromCharCode(k);
@@ -73,7 +71,7 @@ function createKey (len) {
 			k=0;
 		}
 		k=k<<1; // k*=2;
-	}	
+	}
 	return {binKey:binKey,key:key};
 }
 
@@ -85,28 +83,45 @@ function random () {
 /**
 * Creation of an array of 4 bytes (32 bits) elements
 * @param  str 		A text string (message or key)
-* @param  by		Number of  bytes (by=4) 					
 * @return An array of 32 bits elements
 */
-function stringToArrayBy (str,by) {
+function stringToArray (str) {
 	// To explain
-	var arrOut=[]; var c=0;	var nc;
-	for (i=0;i<str.length;i++) {
-		nc=str.substr(i,1).charCodeAt(0);
-		if (nc>255) error("It's not allowed to use unicode 16 bits char. !");
-		c=(c<<8)+nc; // (c*256)
-		if (i%by==(by-1)) {
-			arrOut.push(c);	c=0;
-		}		
+	var arrOut=[];
+	for (i=0;i<str.length;i+=4) {
+		newByte = compact(
+			str.charCodeAt(i),
+			str.charCodeAt(i + 1), // Note: .charCodeAt(j) returns NaN if j
+			str.charCodeAt(i + 2), // is out of bound, which is not an issue
+			str.charCodeAt(i + 3)  // since "NaN << x === 0".
+		);
+		arrOut.push(newByte);
 	}
-	if (c!=0) arrOut.push(c);	
-	return arrOut;		
+	return arrOut;
 }
 
+
 /**
-* Ciphering 
+* Compact four bytes (i.e., ints below 256) in an int of 4 bytes.
+* @param a, b, c, d 	fours 8-bits ints. If they are NaN, they
+*						will be considered as 0.
+* @return A 32-bits int
+*/
+function compact (a, b, c, d) {
+	if(a > 255 || b > 255 || c > 255 || d > 255){
+		error("Use of unicode 16 bits chars is not allowed!");
+	}
+
+	// the "<< 0" if hack to coerce d into 0 if d is NaN.
+	return a << 24 | b << 16 | c << 8 | d << 0;
+}
+
+
+
+/**
+* Ciphering
 * @param  msgArr 			Message's 32 bits elements array
-* @param  keyArr			Key's 32 bits elements array					
+* @param  keyArr			Key's 32 bits elements array
 * @return Ciphered message in 32 bits elements array
 */
 function cipher (msgArr,keyArr) {
@@ -120,41 +135,50 @@ function cipher (msgArr,keyArr) {
 	return arrOut;
 }
 /**
-* Unciphering 
+* Unciphering
 * @param  cipherArr 		Message's 32 bits elements array
-* @param  keyArr			Key's 32 bits elements array					
+* @param  keyArr			Key's 32 bits elements array
 * @return Unciphered message in 32 bits elements array
 */
 function uncipher (cipherArr,keyArr) {
-	//TODO	
+	//TODO
 	return cipher (cipherArr,keyArr) ;
 }
+
 /**
 * Reconstruction of plain text
 * @param  arr 		Unciphered array
-* @param  by		Number of  bytes (by=4) 					
+* @param  by		Number of  bytes (by=4)
 * @return Original text reconstituted
 */
-function arrayByToString (arr,by) {
-	// To Explain
-	var str=""; var strBy=""; var c;
+function arrayToString (arr) {
+	var str="";
 	for (var i=0;i<arr.length;i++) {
-		var nBy=arr[i];	
-		for (var j=0;j<by;j++) {				
-			 c=nBy & parseInt("11111111",2); 			// extract current right byte value 
-														// or c=nBy&255 ; 
-														// or c=nBy%256; 
-														// or c=nBy & parseInt("11111111",2); 
-														//    because 11111111 binary == 255 
-			if (c!=0) {  								// If it's not the last octets	
-				strBy=String.fromCharCode(c)+strBy; 	//    put char at the left of tmp string
-				nBy=nBy>>8; 							//    suppress right byte
-														//    or nBy=Math.floor(nBy/256); 
-			 }
-		}
-		str+=strBy;strBy="";
+		str += unpack(arr[i]);
 	}
 	return str;
+}
+
+/**
+* Interprete an 32-bits int as a string of 4 chars,
+* 8 bits by char. The bytes containing only "0" are truned into the empty
+* string.
+* @param n 		an integer
+* @return       a string.
+*/
+function unpack (n) {
+	var mask = 0b11111111; // eight "1", mask == 255
+
+	var d = n & mask;
+	var c = (n >> 8) & mask;
+	var b = (n >> 16) & mask;
+	var a = (n >> 24) & mask;
+	return (
+		(a !== 0 ? String.fromCharCode(a): "")
+		+ (b !== 0 ? String.fromCharCode(b): "")
+		+ (c !== 0 ? String.fromCharCode(c): "")
+		+ (d !== 0 ? String.fromCharCode(d): "")
+	);
 }
 function toUnicode(str) {
 	var nc; var utf;
@@ -166,6 +190,7 @@ function toUnicode(str) {
 	}
 	return str;
 }
+
 //util func
 function log (o="") {
 	$("info").innerHTML+=o+"<br/>";
@@ -174,9 +199,9 @@ function logArr (arr) {
 	if(arr.length==0) log(">> vide !");
 	for (var i in arr) {
 		log(" ["+arr[i]+"]");
-	}	
+	}
 }
-function $ (id) { 
+function $ (id) {
 	return document.getElementById(id);
 }
 function breakPoint () {
